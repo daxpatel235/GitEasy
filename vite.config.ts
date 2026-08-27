@@ -1,10 +1,21 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
+import { createRequire } from "node:module";
+
+const { version } = createRequire(import.meta.url)("./package.json") as {
+  version: string;
+};
 
 // Tauri expects a fixed port and does its own error reporting.
 export default defineConfig({
   plugins: [react()],
+
+  // The version is read from package.json at build time so the About screen
+  // can never drift from what was actually shipped.
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+  },
 
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

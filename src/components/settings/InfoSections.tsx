@@ -21,6 +21,9 @@ import {
 import type { GitIdentity, Remote, Repository } from "@/types/git";
 import type { GitHubAccount } from "@/types/github";
 
+/** Injected by Vite from package.json — see vite.config.ts. */
+const APP_VERSION = __APP_VERSION__;
+
 interface RepositorySectionProps {
   repo: Repository | null;
   onChangeRepository: () => void;
@@ -423,7 +426,7 @@ export function AboutSection({ onReplayIntro }: { onReplayIntro?: () => void }) 
       <SettingsRow
         leading={<RowIcon><GitEasyLogo className="h-[15px] w-[15px]" /></RowIcon>}
         title="GitEasy"
-        subtitle="Version 0.2.0 — free, and always will be"
+        subtitle={`Version ${APP_VERSION} — free, and always will be`}
         interactive={false}
       />
 

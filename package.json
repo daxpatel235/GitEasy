@@ -1,7 +1,7 @@
 {
   "name": "giteasy",
   "private": true,
-  "version": "0.2.0",
+  "version": "1.0.0",
   "type": "module",
   "description": "A Git client that uses the real words, and explains every one of them.",
   "scripts": {

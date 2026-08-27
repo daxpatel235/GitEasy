@@ -1,0 +1,110 @@
+name: Release
+
+# Publishing is deliberate: pushing a v* tag is what cuts a release, so an
+# ordinary commit to main never ships anything. `workflow_dispatch` allows a
+# manual run from the Actions tab when a build needs repeating.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# The job creates a release and uploads installers to it.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      # One platform failing should not discard the installers the others
+      # already produced — they can be attached to the draft by hand.
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            name: macOS (Apple silicon)
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            name: macOS (Intel)
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            name: Linux
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            name: Windows
+
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tauri's Linux dependencies. WebKitGTK is the webview; the rest are what
+      # the AppImage and .deb bundlers need. Ubuntu 22.04 is used rather than
+      # 24.04 because it links against an older glibc, so the binary runs on
+      # more distributions.
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      # Rust builds are slow from cold; this makes repeat releases minutes
+      # rather than tens of minutes.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build and publish installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --target ${{ matrix.target }}
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
+          releaseName: GitEasy __VERSION__
+          releaseBody: |
+            Download the installer for your platform below.
+
+            | Platform | File |
+            | -------- | ---- |
+            | Windows | `.exe` — the standard installer. `.msi` is for managed deployments. |
+            | macOS | `.dmg` — Apple silicon and Intel builds are listed separately. |
+            | Linux | `.AppImage` runs anywhere; `.deb` for Debian and Ubuntu. |
+
+            GitEasy needs Git installed to do anything, and the GitHub CLI for the GitHub screens.
+
+            **macOS:** the app is not notarised yet, so the first launch needs
+            right-click → Open rather than a double-click.
+          # Published as a draft so the release can be read over before it goes
+          # public, and so all four matrix jobs can attach to the same one.
+          releaseDraft: true
+          prerelease: false
