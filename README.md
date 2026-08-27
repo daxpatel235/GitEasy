@@ -1,6 +1,9 @@
-# GitEasy
+<div align="center">
+  <img src="assets/brand/wordmark.png" alt="GitEasy" width="128" />
+  <p><strong>A Git client for people who haven't learned Git yet —<br />and a fast one for people who have.</strong></p>
+</div>
 
-**A Git client for people who haven't learned Git yet — and a fast one for people who have.**
+---
 
 Most beginner-friendly Git tools hide Git behind invented words. "Save to cloud." "Sync." "Backup." They get you through today and leave you stranded the first time a colleague asks whether you pushed.
 

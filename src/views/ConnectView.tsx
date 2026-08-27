@@ -2,7 +2,7 @@ import { Button } from "@/components/Button";
 import {
   DownloadIcon,
   FolderIcon,
-  GitEasyLogo,
+  GitEasyMark,
   PlusIcon,
   RepoIcon,
   TrashIcon,
@@ -38,7 +38,7 @@ export function ConnectView({
     <div className="ambient relative grid h-full place-items-center bg-ground p-6">
       <div className="relative z-10 flex w-full max-w-[400px] flex-col items-center text-center">
         <div className="mb-6 flex items-center gap-[9px]">
-          <GitEasyLogo className="h-[22px] w-[22px] text-accent" />
+          <GitEasyMark className="h-[26px] w-[26px] rounded-[6px]" />
           <span className="display text-[15px] font-semibold">GitEasy</span>
         </div>
 

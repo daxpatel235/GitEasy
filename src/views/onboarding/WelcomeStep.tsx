@@ -1,13 +1,13 @@
-import { GitEasyLogo } from "@/components/Icons";
+import { GitEasyMark } from "@/components/Icons";
 import { Stagger } from "./OnboardingShell";
 
 export function WelcomeStep({ onNext }: { onNext: () => void }) {
   return (
     <div className="flex flex-col items-center text-center">
+      {/* The first thing anyone sees, so it is the real brand mark rather than
+          a themed glyph on a surface. */}
       <div className="animate-logo-in">
-        <span className="grid h-[76px] w-[76px] place-items-center rounded-[22px] border border-line bg-surface/70 shadow-lg backdrop-blur-xl">
-          <GitEasyLogo className="h-9 w-9 text-accent" />
-        </span>
+        <GitEasyMark className="h-[76px] w-[76px] rounded-[22px] shadow-lg" />
       </div>
 
       <Stagger delay={140} className="mt-8">

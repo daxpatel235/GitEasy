@@ -212,12 +212,88 @@ export function CloudUploadIcon(props: IconProps) {
   );
 }
 
+/**
+ * The GitEasy mark: one commit branching into two.
+ *
+ * Drawn as vector rather than scaled from the source PNG so it stays sharp at
+ * every size it appears at — 15px in a settings row, 36px on the welcome
+ * screen — and inherits `currentColor`, which is what lets it sit correctly in
+ * all fourteen palettes across light and dark.
+ *
+ * Geometry traced from the brand artwork in `assets/brand/wordmark.png`,
+ * normalised so the mark is optically centred in the box.
+ */
+/**
+ * The mark's paths, shared by the themed logo and the full-colour brand tile.
+ *
+ * Coordinates are the artwork's own geometry mapped into a 24 box: the node
+ * centres and radii, the stroke weight and the fork position are all measured
+ * from `assets/brand/wordmark.png` rather than eyeballed, so the vector is the
+ * same shape as the source at any size.
+ */
+function MarkPaths({ colour }: { colour: string }) {
+  return (
+    <>
+      {/* Stem down from the parent commit, then two arms to the children. */}
+      <path
+        d="M12 8.2v7.8"
+        stroke={colour}
+        strokeWidth={2.27}
+        strokeLinecap="round"
+      />
+      <path
+        d="M12 15.96c0 2.4-2.6 2.5-5.35 3.9M12 15.96c0 2.4 2.6 2.5 5.35 3.9"
+        stroke={colour}
+        strokeWidth={2.27}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <circle cx="12" cy="4.95" r="3.27" fill={colour} />
+      <circle cx="4.3" cy="19.87" r="2.45" fill={colour} />
+      <circle cx="19.7" cy="19.87" r="2.45" fill={colour} />
+    </>
+  );
+}
+
 export function GitEasyLogo(props: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" {...props}>
-      <circle cx="12" cy="5" r="2.6" stroke="currentColor" strokeWidth={1.8} />
-      <circle cx="12" cy="19" r="2.6" stroke="currentColor" strokeWidth={1.8} />
-      <path d="M12 7.6v8.8" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" />
+      <MarkPaths colour="currentColor" />
+    </svg>
+  );
+}
+
+/**
+ * The full-colour brand mark — gradient tile plus the white glyph.
+ *
+ * Used where GitEasy is introducing itself (onboarding, the connect screen)
+ * rather than acting as a piece of interface furniture. Everywhere else uses
+ * `GitEasyLogo`, which takes the surrounding text colour.
+ *
+ * The gradient id is derived from a module-level counter so two marks on the
+ * same page cannot collide on it.
+ */
+let markInstance = 0;
+
+export function GitEasyMark({ className = "" }: { className?: string }) {
+  const id = `giteasy-mark-${(markInstance += 1)}`;
+
+  return (
+    <svg viewBox="0 0 48 48" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#7868EC" />
+          <stop offset="100%" stopColor="#4F40CA" />
+        </linearGradient>
+      </defs>
+      <rect width="48" height="48" rx="9.85" fill={`url(#${id})`} />
+      {/* The mark is centred in its own 24 box, so this scales it about the
+          tile's centre to fill half the width — the same glyph-to-tile ratio as
+          the source artwork. */}
+      <g transform="translate(10.047 10.047) scale(1.1628)">
+        <MarkPaths colour="#fff" />
+      </g>
     </svg>
   );
 }
