@@ -1,0 +1,221 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /*
+   * Fallback tokens (Slate / dark).
+   *
+   * ThemeProvider overwrites these on <html> at mount. They exist so the very
+   * first paint — before React hydrates — is never unstyled.
+   */
+  :root {
+    --ground: 18 19 26;
+    --surface: 26 28 37;
+    --surface-alt: 32 34 45;
+    --surface-raised: 33 35 47;
+    --border: 40 43 55;
+    --border-soft: 34 36 47;
+    --text: 232 233 237;
+    --text-muted: 139 143 163;
+    --text-faint: 102 106 124;
+    --accent: 91 140 255;
+    --accent-hover: 114 155 255;
+    --accent-text: 14 15 21;
+    --st-modified: 224 164 88;
+    --st-added: 95 179 126;
+    --st-deleted: 217 97 91;
+    --glow-a: 70 92 170;
+    --glow-b: 48 56 105;
+
+    /* ThemeProvider overwrites these when a font pairing is applied. */
+    --font-ui: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ground text-content font-sans antialiased;
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: -0.006em;
+    -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+  }
+
+  /* Geist runs wide at display sizes — tighten the headings. */
+  h1,
+  h2,
+  h3,
+  .display {
+    letter-spacing: -0.021em;
+  }
+
+  /* Monospace never gets the negative tracking. */
+  code,
+  pre,
+  .font-mono {
+    letter-spacing: 0;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent ring-offset-2;
+    --tw-ring-offset-color: rgb(var(--ground));
+  }
+
+  button {
+    @apply cursor-pointer;
+  }
+
+  /* Scrollbars tuned to the active theme rather than the OS default. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--border));
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--text-faint));
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  /*
+   * Ambient background wash.
+   *
+   * Two wide, very low-opacity radial gradients tinted by the active palette.
+   * This is what gives the app the soft coloured depth of the Windows 11
+   * settings surface instead of a flat fill. Sits behind all content.
+   */
+  .ambient::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    /*
+     * Its own compositor layer.
+     *
+     * Two full-viewport radial gradients are expensive to rasterise, and
+     * without this the browser redraws them whenever anything painted above
+     * changes — which, on a screen with a live file list, is constantly. On its
+     * own layer it is rasterised once and simply composited afterwards.
+     */
+    transform: translateZ(0);
+    will-change: transform;
+    background:
+      radial-gradient(
+        120% 90% at 88% 8%,
+        rgb(var(--glow-a) / 0.22) 0%,
+        transparent 58%
+      ),
+      radial-gradient(
+        100% 80% at 8% 96%,
+        rgb(var(--glow-b) / 0.18) 0%,
+        transparent 60%
+      );
+  }
+
+  /* Light mode carries less of the wash — it reads as dirt on white. */
+  :root[data-mode="light"] .ambient::before {
+    background:
+      radial-gradient(
+        120% 90% at 88% 8%,
+        rgb(var(--glow-a) / 0.1) 0%,
+        transparent 58%
+      ),
+      radial-gradient(
+        100% 80% at 8% 96%,
+        rgb(var(--glow-b) / 0.08) 0%,
+        transparent 60%
+      );
+  }
+
+  /*
+   * Windows 11 settings row.
+   *
+   * A raised card with a hairline border and a faint top-edge highlight, which
+   * is what sells the "lifted off the surface" look in the reference.
+   */
+  .settings-row {
+    @apply relative flex w-full items-center gap-4 rounded-card border border-line/70 px-4 py-3 text-left transition-colors duration-150;
+    background: linear-gradient(
+      180deg,
+      rgb(var(--surface-raised) / 0.9) 0%,
+      rgb(var(--surface-raised) / 0.62) 100%
+    );
+  }
+
+  .settings-row:hover {
+    background: linear-gradient(
+      180deg,
+      rgb(var(--surface-raised) / 1) 0%,
+      rgb(var(--surface-raised) / 0.78) 100%
+    );
+    @apply border-line;
+  }
+
+  .settings-row[data-selected="true"] {
+    @apply border-accent/50;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer components {
+  /*
+   * Skip work for rows that are scrolled out of sight.
+   *
+   * `content-visibility: auto` lets the browser leave the inside of an
+   * off-screen element unlaid-out and unpainted until it approaches the
+   * viewport. On a diff of several hundred lines, or a history of two hundred
+   * commits, that is most of the work on the page.
+   *
+   * `contain-intrinsic-size` gives each skipped row a placeholder height so the
+   * scrollbar stays honest and nothing jumps as rows are realised.
+   */
+  .row-skip {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 44px;
+  }
+
+  .diff-line-skip {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 20px;
+  }
+
+  /*
+   * Confine layout and paint to the row itself.
+   *
+   * Without this, a row changing height forces the browser to reconsider the
+   * whole list; with it, the effect stops at the row's own box.
+   */
+  .row-contain {
+    contain: layout paint style;
+  }
+}

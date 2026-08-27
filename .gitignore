@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+*.local
+
+# Rust / Tauri build artefacts
+src-tauri/target
+src-tauri/gen
+
+# Local scratch work, not part of the product
+server
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# Environment and secrets — never commit these
+.env
+.env.*
+!.env.example

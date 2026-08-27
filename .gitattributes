@@ -1,0 +1,19 @@
+# Normalise line endings in the repository, so a checkout on Windows, macOS or
+# Linux produces the same file and nobody sees a diff that is only endings.
+* text=auto eol=lf
+
+# Binary assets Git must never try to normalise.
+*.png binary
+*.jpg binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.exe binary
+*.dll binary
+*.msi binary
+*.dmg binary
+*.AppImage binary
+
+# Keep the lockfile out of diff review noise.
+package-lock.json linguist-generated=true -diff
