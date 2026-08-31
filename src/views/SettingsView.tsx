@@ -48,6 +48,8 @@ interface SettingsViewProps {
   onSignIn: () => void;
   onSignOut: () => void;
   onReplayIntro: () => void;
+  /** Update controls, forwarded to the About section. */
+  update?: React.ComponentProps<typeof AboutSection>["update"];
   /** The name and email stamped on commits — separate from the account. */
   identity?: GitIdentity | null;
   /** Set when the Git email is not on the signed-in GitHub account. */
@@ -69,6 +71,7 @@ export function SettingsView({
   onSignIn,
   onSignOut,
   onReplayIntro,
+  update,
   identity,
   identityWarning,
   onEditIdentity,
@@ -136,7 +139,7 @@ export function SettingsView({
       )}
       {section === "theme" && <ThemeSection />}
       {section === "shortcuts" && <ShortcutsSection />}
-      {section === "about" && <AboutSection onReplayIntro={onReplayIntro} />}
+      {section === "about" && <AboutSection onReplayIntro={onReplayIntro} update={update} />}
     </div>
   );
 }

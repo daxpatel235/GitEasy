@@ -476,6 +476,14 @@ export function ShieldIcon(props: IconProps) {
   );
 }
 
+export function BoltIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M13 3 5.5 13.2h5.2L11 21l7.5-10.2h-5.2L13 3Z" />
+    </Icon>
+  );
+}
+
 export function UserIcon(props: IconProps) {
   return (
     <Icon {...props}>

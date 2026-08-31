@@ -25,3 +25,10 @@ Thumbs.db
 .env.*
 !.env.example
 TODO.md
+
+# Updater signing keys. The private key lives in GitHub Secrets and in an
+# offline backup; if it ever reaches the repository, anyone who can read the
+# repository can sign an update that installs itself on every user's machine.
+*.key
+!*.key.pub
+minisign*.key

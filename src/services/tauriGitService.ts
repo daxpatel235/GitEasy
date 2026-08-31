@@ -193,7 +193,7 @@ export const tauriGitService: GitService = {
 
   async suggestCommitMessage(files, repo, useAi = false) {
     // Without a repository there is nothing to read the changes from.
-    if (!repo) return { message: "", explanation: "" };
+    if (!repo) return { message: "", explanation: "", alternatives: [] };
 
     return call<CommitSuggestion>("suggest_commit_message", {
       path: repo.path,

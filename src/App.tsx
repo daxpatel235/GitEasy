@@ -44,6 +44,14 @@ import { gitService, githubService, setActiveRepoPath } from "@/services";
 import { toAppError } from "@/services/shared";
 import { useRepositoryWatcher } from "@/hooks/useRepositoryWatcher";
 import { usePersistentBehaviour } from "@/hooks/usePersistentBehaviour";
+import {
+  useSessionRestore,
+  useRememberSession,
+  type RestoredSession,
+} from "@/hooks/useSessionRestore";
+import { ReleaseNotes } from "@/components/ReleaseNotes";
+import { UpdatePill } from "@/components/UpdatePill";
+import { useAppUpdate } from "@/hooks/useAppUpdate";
 import { IdentityModal } from "@/components/IdentityModal";
 import type {
   AppError,
@@ -62,7 +70,7 @@ import type {
   Tag,
 } from "@/types/git";
 import type { GitHubAccount, Issue, PullRequest, Release, RemoteRepo, WorkflowRun } from "@/types/github";
-import type { View } from "@/types/navigation";
+import { NAVIGABLE_VIEWS, type View } from "@/types/navigation";
 
 /** Sidebar order, for the Ctrl+1…9 shortcuts. */
 const VIEW_ORDER: View[] = [
@@ -121,7 +129,11 @@ export default function App() {
   /* --- UI state ------------------------------------------------------------ */
 
   const [view, setView] = useState<View>("home");
-  const [behaviour, setBehaviour] = usePersistentBehaviour();
+  const [behaviour, setBehaviour, behaviourLoaded] = usePersistentBehaviour();
+
+  // Checked a few seconds after launch and every six hours after that. The
+  // download may be automatic; installing over the running app never is.
+  const appUpdate = useAppUpdate();
 
   /** What Git and GitHub look like on this machine. */
   const [environment, setEnvironment] = useState<Environment | null>(null);
@@ -134,6 +146,18 @@ export default function App() {
   const [description, setDescription] = useState("");
   const [explanation, setExplanation] = useState("");
   const [regenerating, setRegenerating] = useState(false);
+
+  /**
+   * Every message suggested for the current changes, headline first.
+   *
+   * Held so "Suggest another" can hand back a genuinely different message
+   * immediately, rather than asking the backend again and getting the same
+   * deterministic answer back.
+   */
+  const suggestions = useRef<string[]>([]);
+  const suggestionAt = useRef(0);
+  /** Mirrors the two refs above, purely so the button can show "2/4". */
+  const [suggestionPosition, setSuggestionPosition] = useState({ index: 0, count: 0 });
 
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
@@ -169,6 +193,9 @@ export default function App() {
     async (forFiles: ChangedFile[], target?: Repository | null) => {
       if (!behaviour.autoSuggest || forFiles.length === 0) {
         setExplanation("");
+        suggestions.current = [];
+        suggestionAt.current = 0;
+        setSuggestionPosition({ index: 0, count: 0 });
         return;
       }
 
@@ -177,6 +204,13 @@ export default function App() {
 
       try {
         const suggestion = await gitService.suggestCommitMessage(forFiles, project);
+
+        suggestions.current = [suggestion.message, ...(suggestion.alternatives ?? [])].filter(
+          (m) => m.trim().length > 0,
+        );
+        suggestionAt.current = 0;
+        setSuggestionPosition({ index: 0, count: suggestions.current.length });
+
         // Re-check after the await: the user may have typed while it ran.
         setMessage((current) => (current.trim().length > 0 ? current : suggestion.message));
         setExplanation(suggestion.explanation);
@@ -392,6 +426,45 @@ export default function App() {
   );
 
   /**
+   * Reopen last time's project on launch.
+   *
+   * Deliberately not `openRepository`: that shows the "you're connected"
+   * dialog, which belongs to the moment somebody *chooses* a folder. Coming
+   * back to work you never left should put you straight back in the project,
+   * on the screen you were on.
+   */
+  const restoreSession = useCallback(
+    ({ repo: saved, view: savedView }: RestoredSession) => {
+      setActiveRepoPath(saved.path);
+      setRepo(saved);
+      setPushResult(null);
+      setPendingCommits([]);
+
+      if (savedView && NAVIGABLE_VIEWS.includes(savedView as View)) {
+        setView(savedView as View);
+      }
+
+      // Same background loading as opening by hand — the window stays
+      // responsive while Git and GitHub are read.
+      void loadRepoState(saved)
+        .then((changed) => void loadSuggestion(changed, saved))
+        .catch(() => undefined);
+      void gitService.getPendingCommits(saved).then(setPendingCommits).catch(() => undefined);
+      void loadGitHubState(saved);
+    },
+    [loadRepoState, loadSuggestion, loadGitHubState],
+  );
+
+  useSessionRestore({
+    enabled: behaviour.restoreSession,
+    ready: behaviourLoaded,
+    hasRepo: repo !== null,
+    onRestore: restoreSession,
+  });
+
+  useRememberSession(repo?.path ?? null, view);
+
+  /**
    * Re-read the project when it changes on disk.
    *
    * The backend watches with native filesystem events and debounces them, so
@@ -553,6 +626,17 @@ export default function App() {
   // Stable, so it does not invalidate the memoised Changes screen on every
   // keystroke in the message box.
   const regenerate = useCallback(async () => {
+    // The backend hands back several distinct messages at once, so the usual
+    // case is stepping to the next one — no round trip, no spinner, and never
+    // the same sentence twice.
+    const cached = suggestions.current;
+    if (cached.length > 1) {
+      suggestionAt.current = (suggestionAt.current + 1) % cached.length;
+      setMessage(cached[suggestionAt.current]!);
+      setSuggestionPosition({ index: suggestionAt.current, count: cached.length });
+      return;
+    }
+
     setRegenerating(true);
     try {
       // Clearing first lets the suggestion replace what is there — otherwise
@@ -853,6 +937,10 @@ export default function App() {
       setMessage("");
       setDescription("");
       setExplanation("");
+      // The shelved changes are gone, so the messages written for them are too.
+      suggestions.current = [];
+      suggestionAt.current = 0;
+      setSuggestionPosition({ index: 0, count: 0 });
       toast("Set aside. Your project is clean — put it back from the Shelf whenever.", "success");
     } catch (error) {
       reportError(error, "Could not set that work aside.");
@@ -1505,6 +1593,31 @@ export default function App() {
       go("go-releases", "Releases", "Tags and published versions", "releases"),
       go("go-learn", "Learn Git", "Every term, explained", "learn", <BookIcon className="h-[15px] w-[15px]" />),
       go("go-settings", "Settings", "Theme, behaviour and account", "settings"),
+
+      // Only offered in the desktop build — there is nothing to update in a
+      // browser, and an entry that cannot work is worse than no entry.
+      ...(appUpdate.supported
+        ? [
+            {
+              id: "app-update",
+              label:
+                appUpdate.phase === "ready"
+                  ? "Restart to finish updating GitEasy"
+                  : "Check for GitEasy updates",
+              hint:
+                appUpdate.phase === "ready"
+                  ? `Version ${appUpdate.version} is downloaded and ready`
+                  : `You are on ${__APP_VERSION__}`,
+              group: "GitEasy",
+              icon: <ArrowDownIcon className="h-[15px] w-[15px]" />,
+              keywords: "update upgrade version release restart",
+              run: () =>
+                appUpdate.phase === "ready"
+                  ? void appUpdate.restart()
+                  : void appUpdate.check({ manual: true }),
+            },
+          ]
+        : []),
     ];
   }, [
     paletteOpen,
@@ -1520,6 +1633,7 @@ export default function App() {
     switchBranch,
     shelve,
     syncFork,
+    appUpdate,
   ]);
 
   /* ---------------------------------------------------------------------- */
@@ -1607,6 +1721,7 @@ export default function App() {
           />
         )}
 
+        <ReleaseNotes />
         <Toasts toasts={toasts} onDismiss={dismiss} />
       </>
     );
@@ -1633,6 +1748,7 @@ export default function App() {
         hasRemote={repo.githubUrl !== null}
         onOpenPalette={() => setPaletteOpen(true)}
         onNewProject={() => setNewProjectOpen(true)}
+        settingsDot={appUpdate.phase === "ready"}
       />
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
@@ -1645,6 +1761,15 @@ export default function App() {
           onNewBranch={() => setNewBranchOpen(true)}
           onFetch={() => void checkForUpdates()}
           onChangeRepository={connect}
+          update={
+            <UpdatePill
+              {...appUpdate}
+              onDownload={() => void appUpdate.download()}
+              onRestart={() => void appUpdate.restart()}
+              onSkip={appUpdate.skip}
+              onDismiss={appUpdate.dismiss}
+            />
+          }
         />
 
         <div className="flex-1 overflow-y-auto">
@@ -1675,6 +1800,8 @@ export default function App() {
                 description={description}
                 explanation={explanation}
                 regenerating={regenerating}
+                suggestionCount={suggestionPosition.count}
+                suggestionIndex={suggestionPosition.index}
                 pushResult={pushResult}
                 onMessageChange={setMessage}
                 onDescriptionChange={setDescription}
@@ -1821,6 +1948,14 @@ export default function App() {
                 onSignIn={() => void signIn()}
                 onSignOut={() => void signOut()}
                 onReplayIntro={replayIntro}
+                update={{
+                  supported: appUpdate.supported,
+                  phase: appUpdate.phase,
+                  version: appUpdate.version,
+                  automatic: appUpdate.automatic,
+                  onSetAutomatic: appUpdate.setAutomaticDownloads,
+                  onCheck: () => void appUpdate.check({ manual: true }),
+                }}
                 identity={environment?.identity ?? null}
                 identityWarning={environment?.identityWarning ?? null}
                 onEditIdentity={() => setIdentityOpen(true)}
@@ -1974,6 +2109,10 @@ export default function App() {
       {paletteOpen && (
         <CommandPalette commands={commands} onClose={() => setPaletteOpen(false)} />
       )}
+
+      {/* Shown once after an update, and never on a first run — somebody who
+          has only just installed GitEasy has not updated anything. */}
+      <ReleaseNotes />
 
       <Toasts toasts={toasts} onDismiss={dismiss} />
     </div>

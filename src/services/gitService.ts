@@ -90,6 +90,9 @@ export interface GitService {
   /**
    * Draft a commit message from the changes. Local and deterministic unless
    * `useAi` is set and a key is configured, so the app works offline.
+   *
+   * Returns several distinct messages — one headline plus `alternatives` —
+   * so "Suggest another" has somewhere to go without asking again.
    */
   suggestCommitMessage(
     files: ChangedFile[],
@@ -765,10 +768,19 @@ export const gitService: GitService = {
 
   async suggestCommitMessage(files) {
     await delay(560);
-    if (files.length === 0) return { message: "", explanation: "" };
-    const suggestion = MOCK_SUGGESTIONS[suggestionIndex % MOCK_SUGGESTIONS.length]!;
+    if (files.length === 0) return { message: "", explanation: "", alternatives: [] };
+
+    // The headline rotates so the demo shows a fresh message each time, and
+    // the rest of the list rides along as the alternatives.
+    const first = MOCK_SUGGESTIONS[suggestionIndex % MOCK_SUGGESTIONS.length]!;
     suggestionIndex += 1;
-    return suggestion;
+
+    return {
+      ...first,
+      alternatives: MOCK_SUGGESTIONS.filter((s) => s.message !== first.message).map(
+        (s) => s.message,
+      ),
+    };
   },
 
   async getCommitWarnings() {

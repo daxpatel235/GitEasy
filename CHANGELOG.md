@@ -5,6 +5,72 @@ All notable changes to GitEasy are recorded here. Versions follow
 
 ---
 
+## 1.0.2 — 2026-09-01
+
+### Added
+
+**Commit messages that are actually worth keeping.**
+
+The commit box has always had a "Suggest another" button, but the offline
+generator was fully deterministic — pressing it re-ran the same function and
+produced the same sentence. Every message also came out shaped as
+`<type>: update <file>`, which makes a log of them unreadable.
+
+The generator now reads what actually happened: what was added, removed or
+renamed, whether the added lines mention a repair, and whether the insertions
+and deletions balance the way moved code does. From that it builds a ranked list
+of genuinely different messages — a different scope, a different framing, a
+defensible second commit type, and a plain unprefixed sentence for projects that
+do not use Conventional Commits. The verb comes from the change too, so it reads
+`add`, `remove`, `rename` or `fix` rather than `update` every time.
+
+The whole list is returned at once, so "Suggest another" steps through it with
+no round trip and shows its position. With an API key configured the model is
+asked for four options rather than one, and the local candidates stay available
+behind them.
+
+**GitEasy reopens where you left off.**
+
+Closing GitEasy — or shutting the machine down — is not a decision to abandon
+what you were working on. It now reopens on the same project and the same
+screen, the way an editor does. Nothing is committed, pushed, pulled or fetched
+on the way in, and the working tree is always read fresh from Git, so a restored
+session can never show a stale view. On by default; switch it off under
+**Settings → Git → Reopen my last project**.
+
+**GitEasy updates itself.**
+
+New versions are found a few seconds after launch and every six hours after
+that, downloaded in the background, and applied the next time you restart.
+
+It shows up in three places, and nowhere at all when there is nothing to say: a
+pill in the top bar, a dot on Settings in the sidebar, and a "Check for GitEasy
+updates" entry in the command palette.
+
+Two things this deliberately does not do. It never installs over the running
+application — replacing GitEasy underneath somebody mid-commit is not an
+acceptable thing to do, so the restart is always the user's decision. And it
+never trusts a download: every update is signed with a key held only in
+repository secrets, and the app refuses anything whose signature does not
+verify, so even a compromised release page cannot push code onto a machine.
+
+Automatic downloading can be turned off under **Settings → About**, and any
+single version can be skipped from the indicator itself.
+
+**Every update says what changed.**
+
+After installing a new version, GitEasy shows a short summary of what is new,
+once. Skipping a release shows both sets of notes rather than only the latest,
+and a fresh install never sees it — there is nothing to catch up on. The full
+list also lives under **Settings → About**.
+
+### Changed
+
+Drafting a commit message now reads the changed files' diffs in one batched call
+rather than spawning a Git process per file.
+
+---
+
 ## 1.0.1 — 2026-09-01
 
 A responsiveness release. Nothing about how GitEasy works changed; what changed

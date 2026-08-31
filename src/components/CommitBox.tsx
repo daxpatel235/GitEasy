@@ -25,6 +25,10 @@ interface CommitBoxProps {
   onDescriptionChange: (description: string) => void;
   onRegenerate: () => void;
   regenerating: boolean;
+  /** How many messages were suggested for these changes, including this one. */
+  suggestionCount?: number;
+  /** Which of them is showing, zero-based. */
+  suggestionIndex?: number;
 }
 
 export function CommitBox({
@@ -35,6 +39,8 @@ export function CommitBox({
   onDescriptionChange,
   onRegenerate,
   regenerating,
+  suggestionCount = 0,
+  suggestionIndex = 0,
 }: CommitBoxProps) {
   const [editing, setEditing] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
@@ -140,6 +146,11 @@ export function CommitBox({
           icon={<RefreshIcon className={`h-3 w-3 ${regenerating ? "animate-spin" : ""}`} />}
         >
           Suggest another
+          {suggestionCount > 1 && (
+            <span className="font-mono text-2xs tabular-nums text-faint">
+              {suggestionIndex + 1}/{suggestionCount}
+            </span>
+          )}
         </MiniButton>
 
         <MiniButton

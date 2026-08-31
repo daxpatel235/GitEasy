@@ -31,6 +31,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        // Updates are checked, downloaded and installed by the frontend, which
+        // asks first. Nothing here reaches the network on its own.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(AppState::new(store))
         .invoke_handler(tauri::generate_handler![
             // Environment, identity, authentication

@@ -92,6 +92,11 @@ export interface CommitSuggestion {
   message: string;
   /** One plain-language sentence describing what changed. */
   explanation: string;
+  /**
+   * Further messages for the same changes, best first, none repeating
+   * `message`. "Suggest another" walks this list.
+   */
+  alternatives?: string[];
 }
 
 export interface PushResult {

@@ -4,6 +4,7 @@ import { Badge } from "../ui/Badge";
 import { Avatar } from "@/views/HistoryView";
 import {
   ArchiveIcon,
+  ArrowDownIcon,
   BranchIcon,
   FolderIcon,
   ForkIcon,
@@ -18,6 +19,7 @@ import {
   TrashIcon,
   UserIcon,
 } from "../Icons";
+import { RELEASE_NOTES } from "@/data/releaseNotes";
 import type { GitIdentity, Remote, Repository } from "@/types/git";
 import type { GitHubAccount } from "@/types/github";
 
@@ -168,6 +170,7 @@ export function RemotesSection({
 }
 
 export interface Behaviour {
+  restoreSession: boolean;
   autoFetch: boolean;
   autoSuggest: boolean;
   confirmPush: boolean;
@@ -179,6 +182,7 @@ export interface Behaviour {
 }
 
 export const DEFAULT_BEHAVIOUR: Behaviour = {
+  restoreSession: true,
   autoFetch: true,
   autoSuggest: true,
   confirmPush: true,
@@ -207,6 +211,15 @@ export function GitSection({
 
   return (
     <div className="flex flex-col gap-[6px]">
+      <GroupLabel>Starting up</GroupLabel>
+      <ToggleRow
+        icon={<RepoIcon className="h-[15px] w-[15px]" />}
+        title="Reopen my last project"
+        subtitle="Opens GitEasy where you left off, with the same project and screen. Nothing is committed, pushed or pulled on the way in."
+        checked={behaviour.restoreSession}
+        onChange={(v) => set("restoreSession", v)}
+      />
+
       <GroupLabel>Keeping up to date</GroupLabel>
       <ToggleRow
         icon={<SyncIcon className="h-[15px] w-[15px]" />}
@@ -420,7 +433,21 @@ export function ShortcutsSection() {
   );
 }
 
-export function AboutSection({ onReplayIntro }: { onReplayIntro?: () => void }) {
+export function AboutSection({
+  onReplayIntro,
+  update,
+}: {
+  onReplayIntro?: () => void;
+  /** Update controls, when the app is running as a desktop build. */
+  update?: {
+    supported: boolean;
+    phase: string;
+    version: string | null;
+    automatic: boolean;
+    onSetAutomatic: (next: boolean) => void;
+    onCheck: () => void;
+  };
+}) {
   return (
     <div className="flex flex-col gap-[6px]">
       <SettingsRow
@@ -429,6 +456,34 @@ export function AboutSection({ onReplayIntro }: { onReplayIntro?: () => void }) 
         subtitle={`Version ${APP_VERSION} — free, and always will be`}
         interactive={false}
       />
+
+      {update?.supported && (
+        <>
+          <GroupLabel>Updates</GroupLabel>
+          <ToggleRow
+            icon={<ArrowDownIcon className="h-[15px] w-[15px]" />}
+            title="Download updates automatically"
+            subtitle="Fetches new versions in the background so they are ready when you are. Nothing is ever installed until you restart, so an update cannot interrupt what you are doing."
+            checked={update.automatic}
+            onChange={update.onSetAutomatic}
+          />
+          <SettingsRow
+            leading={<RowIcon><SyncIcon className="h-[15px] w-[15px]" /></RowIcon>}
+            title="Check for updates now"
+            subtitle={
+              update.phase === "checking"
+                ? "Looking…"
+                : update.phase === "available" || update.phase === "downloading"
+                  ? `GitEasy ${update.version} is available`
+                  : update.phase === "ready"
+                    ? "Ready — restart to finish updating"
+                    : "GitEasy is up to date"
+            }
+            onClick={update.onCheck}
+            trailing={<TrailingHint>Check</TrailingHint>}
+          />
+        </>
+      )}
 
       {onReplayIntro && (
         <SettingsRow
@@ -447,6 +502,30 @@ export function AboutSection({ onReplayIntro }: { onReplayIntro?: () => void }) 
           when you move to the terminal.
         </p>
       </div>
+
+      <GroupLabel>What changed</GroupLabel>
+      {RELEASE_NOTES.map((note) => (
+        <div key={note.version} className="settings-row flex-col items-start gap-[6px]">
+          <div className="flex items-baseline gap-2">
+            <span className="font-mono text-[13px] font-semibold text-accent">{note.version}</span>
+            <span className="text-2xs text-faint">
+              {new Date(note.date).toLocaleDateString(undefined, {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </span>
+          </div>
+          <p className="max-w-[62ch] text-[13px] leading-relaxed text-muted">{note.headline}</p>
+          <ul className="flex list-disc flex-col gap-[3px] pl-4">
+            {note.highlights.map((highlight) => (
+              <li key={highlight.title} className="text-[12.5px] leading-relaxed text-muted">
+                <span className="text-content">{highlight.title}</span> — {highlight.body}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
     </div>
   );
 }

@@ -24,6 +24,9 @@ interface ChangesViewProps {
   description: string;
   explanation: string;
   regenerating: boolean;
+  /** How many messages were suggested for these changes, and which is showing. */
+  suggestionCount: number;
+  suggestionIndex: number;
   pushResult: PushResult | null;
   onMessageChange: (message: string) => void;
   onDescriptionChange: (description: string) => void;
@@ -49,6 +52,8 @@ const ChangesViewImpl = ({
   description,
   explanation,
   regenerating,
+  suggestionCount,
+  suggestionIndex,
   pushResult,
   onMessageChange,
   onDescriptionChange,
@@ -192,6 +197,8 @@ const ChangesViewImpl = ({
             onDescriptionChange={onDescriptionChange}
             onRegenerate={onRegenerate}
             regenerating={regenerating}
+            suggestionCount={suggestionCount}
+            suggestionIndex={suggestionIndex}
           />
 
           {staged.length === 0 && (

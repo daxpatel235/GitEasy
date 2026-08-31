@@ -19,6 +19,17 @@ jobs:
       # One platform failing should not discard the installers the others
       # already produced — they can be attached to the draft by hand.
       fail-fast: false
+
+      # The updater's `latest.json` carries one entry per platform, and each job
+      # updates it by downloading the current file, adding its own entry and
+      # re-uploading. That is a read-modify-write with no locking, so two jobs
+      # finishing at once can each write a copy that is missing the other's
+      # platform — leaving some users with no update available at all.
+      #
+      # Building one platform at a time is slower, but a release that silently
+      # cannot update half its users is not worth the saved minutes.
+      max-parallel: 1
+
       matrix:
         include:
           - platform: macos-latest
@@ -86,6 +97,11 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Signs the update bundles and produces `latest.json`. The private key
+          # lives only in repository secrets — an unsigned build cannot install
+          # itself over anybody's copy, which is the whole point of the scheme.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --target ${{ matrix.target }}
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || 'v__VERSION__' }}
@@ -103,6 +119,13 @@ jobs:
 
             **macOS:** the app is not notarised yet, so the first launch needs
             right-click → Open rather than a double-click.
+
+            <!-- Do not delete `latest.json` or the `.app.tar.gz`/`.nsis.zip`
+                 bundles from this release. They are not for people to download
+                 — they are what the in-app updater fetches, and removing them
+                 silently breaks updating for everybody already running
+                 GitEasy. -->
+
           # Published as a draft so the release can be read over before it goes
           # public, and so all four matrix jobs can attach to the same one.
           releaseDraft: true

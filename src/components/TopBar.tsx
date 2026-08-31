@@ -23,6 +23,13 @@ interface TopBarProps {
   onNewBranch: () => void;
   onFetch: () => void;
   onChangeRepository: () => void;
+  /**
+   * The update indicator, passed in rather than built here.
+   *
+   * It keeps its own state and would otherwise mean threading six props
+   * through a component that is memoised precisely to avoid that.
+   */
+  update?: React.ReactNode;
 }
 
 const TopBarImpl = ({
@@ -34,6 +41,7 @@ const TopBarImpl = ({
   onNewBranch,
   onFetch,
   onChangeRepository,
+  update,
 }: TopBarProps) => {
   return (
     <header className="relative z-20 flex h-[48px] flex-none items-center gap-2 border-b border-line bg-surface/70 px-4 backdrop-blur-xl">
@@ -57,6 +65,7 @@ const TopBarImpl = ({
       />
 
       <div className="ml-auto flex flex-none items-center gap-2">
+        {update}
         {sync && <SyncPill sync={sync} />}
 
         <button

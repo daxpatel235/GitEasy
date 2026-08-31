@@ -1,6 +1,6 @@
 [package]
 name = "giteasy"
-version = "1.0.1"
+version = "1.0.2"
 description = "A beginner-friendly Git client"
 authors = ["GitEasy"]
 edition = "2021"
@@ -17,6 +17,14 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+
+# In-place updates. Every update is signed with a key that never leaves GitHub
+# Secrets, and the plugin refuses anything whose signature does not verify, so a
+# tampered or spoofed release cannot install itself. `process` is what restarts
+# the app once an update has been staged.
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

@@ -90,6 +90,14 @@ interface SidebarProps {
   hasRemote: boolean;
   onOpenPalette: () => void;
   onNewProject: () => void;
+  /**
+   * Marks Settings with a dot when an update is waiting.
+   *
+   * A count would be wrong here — "1 update" is not a quantity anybody needs.
+   * What it has to say is only "there is something for you in here", which is
+   * exactly what a dot says and a number does not.
+   */
+  settingsDot?: boolean;
 }
 
 const SidebarImpl = ({
@@ -99,6 +107,7 @@ const SidebarImpl = ({
   hasRemote,
   onOpenPalette,
   onNewProject,
+  settingsDot = false,
 }: SidebarProps) => {
   return (
     <aside className="relative z-10 flex w-[212px] flex-none flex-col gap-4 overflow-y-auto border-r border-line bg-surface/70 px-3 py-[18px] backdrop-blur-xl">
@@ -171,6 +180,13 @@ const SidebarImpl = ({
                     >
                       {count}
                     </span>
+                  )}
+
+                  {id === "settings" && settingsDot && count === 0 && (
+                    <span
+                      title="An update is ready"
+                      className="ml-auto h-[7px] w-[7px] flex-none rounded-full bg-accent shadow-[0_0_0_3px_rgb(var(--accent)/0.18)]"
+                    />
                   )}
                 </button>
               );

@@ -126,6 +126,11 @@ pub struct PushResult {
 pub struct CommitSuggestion {
     pub message: String,
     pub explanation: String,
+    /// Further messages for the same changes, best first, none repeating the
+    /// one in `message`. "Suggest another" walks this list, which is what keeps
+    /// the button from handing back the same sentence every time.
+    #[serde(default)]
+    pub alternatives: Vec<String>,
 }
 
 /// One line of blame.

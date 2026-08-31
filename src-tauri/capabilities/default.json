@@ -1,7 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissions GitEasy needs: choosing a folder and opening GitHub links.",
+  "description": "Permissions GitEasy needs: choosing a folder, opening GitHub links, and installing a signed update the user has asked for.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open", "opener:allow-open-url"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "opener:allow-open-url",
+    "updater:default",
+    "process:allow-restart"
+  ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "giteasy",
   "private": true,
-  "version": "1.0.1",
+  "version": "1.0.2",
   "type": "module",
   "description": "A Git client that uses the real words, and explains every one of them.",
   "scripts": {
@@ -17,6 +17,8 @@
     "@tauri-apps/api": "^2.1.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-opener": "^2.2.5",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.11.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },

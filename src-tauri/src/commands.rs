@@ -882,11 +882,15 @@ pub async fn suggest_commit_message(
         all.into_iter().filter(|f| files.contains(&f.path)).collect()
     };
 
-    // Only the diff of the chosen files is ever gathered, and `ai` trims it
-    // further before anything leaves the machine.
-    let diff = chosen
+    // Only the diff of the chosen files is ever gathered — one batched call
+    // rather than a process per file — and `ai` trims it further before
+    // anything leaves the machine.
+    let paths: Vec<String> = chosen.iter().map(|f| f.path.clone()).collect();
+    let patches = git::status::diffs_for(&repo, &paths);
+    let diff = paths
         .iter()
-        .filter_map(|f| git::status::file_diff(&repo, &f.path).ok())
+        .filter_map(|p| patches.get(p))
+        .cloned()
         .collect::<Vec<String>>()
         .join("\n");
 
