@@ -47,7 +47,7 @@ fn repo(path: &str) -> AppResult<PathBuf> {
 
 /// Everything GitEasy needs to know about this machine, in one call.
 #[tauri::command]
-pub fn environment() -> Environment {
+pub async fn environment() -> Environment {
     let git_installed = exec::git_installed();
     let gh_installed = exec::gh_installed();
 
@@ -83,13 +83,13 @@ pub fn environment() -> Environment {
 
 /// Whether the Git CLI is on this machine at all.
 #[tauri::command]
-pub fn git_installed() -> bool {
+pub async fn git_installed() -> bool {
     exec::git_installed()
 }
 
 /// The Git identity commits are stamped with.
 #[tauri::command]
-pub fn git_identity(path: Option<String>) -> GitIdentity {
+pub async fn git_identity(path: Option<String>) -> GitIdentity {
     let repo = path.as_deref().and_then(|p| git::repo_path(p).ok());
     git::commits::identity(repo.as_deref())
 }
@@ -97,7 +97,7 @@ pub fn git_identity(path: Option<String>) -> GitIdentity {
 /// Write the Git identity. Only ever called from the setup screen, which shows
 /// the user exactly what will be written first.
 #[tauri::command]
-pub fn set_git_identity(
+pub async fn set_git_identity(
     path: Option<String>,
     name: String,
     email: String,
@@ -109,19 +109,19 @@ pub fn set_git_identity(
 
 /// Who is signed in to GitHub, or null.
 #[tauri::command]
-pub fn github_account() -> Option<GitHubAccount> {
+pub async fn github_account() -> Option<GitHubAccount> {
     github::auth::account()
 }
 
 /// Start the official GitHub browser sign-in.
 #[tauri::command]
-pub fn github_sign_in() -> AppResult<GitHubAccount> {
+pub async fn github_sign_in() -> AppResult<GitHubAccount> {
     github::auth::sign_in()
 }
 
 /// Sign out of GitHub.
 #[tauri::command]
-pub fn github_sign_out() -> AppResult<()> {
+pub async fn github_sign_out() -> AppResult<()> {
     github::auth::sign_out()
 }
 
@@ -131,7 +131,7 @@ pub fn github_sign_out() -> AppResult<()> {
 
 /// Open a repository and start watching it.
 #[tauri::command]
-pub fn open_repository(
+pub async fn open_repository(
     app: AppHandle,
     state: State<'_, AppState>,
     path: String,
@@ -150,13 +150,13 @@ pub fn open_repository(
 
 /// Whether a folder is a Git repository, without opening it.
 #[tauri::command]
-pub fn is_repository(path: String) -> bool {
+pub async fn is_repository(path: String) -> bool {
     git::repo::detect(&path)
 }
 
 /// Create a new repository in a folder.
 #[tauri::command]
-pub fn init_repository(
+pub async fn init_repository(
     app: AppHandle,
     state: State<'_, AppState>,
     path: String,
@@ -177,7 +177,7 @@ pub fn init_repository(
 
 /// Clone a repository into a folder.
 #[tauri::command]
-pub fn clone_repository(
+pub async fn clone_repository(
     app: AppHandle,
     state: State<'_, AppState>,
     url: String,
@@ -197,7 +197,7 @@ pub fn clone_repository(
 
 /// Create a GitHub repository and connect this folder to it as `origin`.
 #[tauri::command]
-pub fn publish_repository(
+pub async fn publish_repository(
     path: String,
     name: String,
     description: String,
@@ -213,19 +213,19 @@ pub fn publish_repository(
 
 /// Recently opened projects.
 #[tauri::command]
-pub fn recent_repositories(state: State<'_, AppState>) -> AppResult<Vec<RecentRepository>> {
+pub async fn recent_repositories(state: State<'_, AppState>) -> AppResult<Vec<RecentRepository>> {
     state.store.recent_repositories(12)
 }
 
 /// Drop one project from the recent list.
 #[tauri::command]
-pub fn forget_repository(state: State<'_, AppState>, path: String) -> AppResult<()> {
+pub async fn forget_repository(state: State<'_, AppState>, path: String) -> AppResult<()> {
     state.store.forget_repository(&path)
 }
 
 /// Whether the repository has no commits yet.
 #[tauri::command]
-pub fn is_empty_repository(path: String) -> AppResult<bool> {
+pub async fn is_empty_repository(path: String) -> AppResult<bool> {
     Ok(git::repo::is_empty(&repo(&path)?))
 }
 
@@ -248,11 +248,16 @@ fn start_watching(app: &AppHandle, state: &State<'_, AppState>, path: &str) {
 }
 
 /// Stop watching, for when the last project is closed.
+///
+/// Returns a Result because Tauri requires it of any async command borrowing
+/// managed state: the borrow has to outlive the future, and `Result` is how the
+/// generated glue expresses that. Nothing here can actually fail.
 #[tauri::command]
-pub fn stop_watching(state: State<'_, AppState>) {
+pub async fn stop_watching(state: State<'_, AppState>) -> AppResult<()> {
     if let Ok(mut guard) = state.watch.lock() {
         *guard = None;
     }
+    Ok(())
 }
 
 /* ========================================================================== */
@@ -261,7 +266,7 @@ pub fn stop_watching(state: State<'_, AppState>) {
 
 /// Everything that differs from the last commit.
 #[tauri::command]
-pub fn changed_files(path: String) -> AppResult<Vec<ChangedFile>> {
+pub async fn changed_files(path: String) -> AppResult<Vec<ChangedFile>> {
     git::status::changed_files(&repo(&path)?)
 }
 
@@ -278,7 +283,7 @@ pub fn changed_files(path: String) -> AppResult<Vec<ChangedFile>> {
 /// webview parses it — and that is the work that makes the window stop
 /// responding on a large change.
 #[tauri::command]
-pub fn changed_files_with_diffs(path: String) -> AppResult<Vec<ChangedFile>> {
+pub async fn changed_files_with_diffs(path: String) -> AppResult<Vec<ChangedFile>> {
     let repo = repo(&path)?;
     let mut files = git::status::changed_files(&repo)?;
 
@@ -321,43 +326,43 @@ pub fn changed_files_with_diffs(path: String) -> AppResult<Vec<ChangedFile>> {
 
 /// The unified diff for one file.
 #[tauri::command]
-pub fn file_diff(path: String, file: String) -> AppResult<String> {
+pub async fn file_diff(path: String, file: String) -> AppResult<String> {
     git::status::file_diff(&repo(&path)?, &file)
 }
 
 /// One file's diff split into hunks.
 #[tauri::command]
-pub fn file_hunks(path: String, file: String, staged: Option<bool>) -> AppResult<Vec<DiffHunk>> {
+pub async fn file_hunks(path: String, file: String, staged: Option<bool>) -> AppResult<Vec<DiffHunk>> {
     git::status::file_hunks(&repo(&path)?, &file, staged.unwrap_or(false))
 }
 
 /// Stage files. An empty list stages everything.
 #[tauri::command]
-pub fn stage_files(path: String, files: Vec<String>) -> AppResult<()> {
+pub async fn stage_files(path: String, files: Vec<String>) -> AppResult<()> {
     git::status::stage(&repo(&path)?, &files)
 }
 
 /// Unstage files. An empty list unstages everything.
 #[tauri::command]
-pub fn unstage_files(path: String, files: Vec<String>) -> AppResult<()> {
+pub async fn unstage_files(path: String, files: Vec<String>) -> AppResult<()> {
     git::status::unstage(&repo(&path)?, &files)
 }
 
 /// Stage one hunk of one file.
 #[tauri::command]
-pub fn stage_hunk(path: String, file: String, hunk: usize) -> AppResult<()> {
+pub async fn stage_hunk(path: String, file: String, hunk: usize) -> AppResult<()> {
     git::status::stage_hunk(&repo(&path)?, &file, hunk)
 }
 
 /// Unstage one hunk of one file.
 #[tauri::command]
-pub fn unstage_hunk(path: String, file: String, hunk: usize) -> AppResult<()> {
+pub async fn unstage_hunk(path: String, file: String, hunk: usize) -> AppResult<()> {
     git::status::unstage_hunk(&repo(&path)?, &file, hunk)
 }
 
 /// Permanently drop uncommitted changes to one file.
 #[tauri::command]
-pub fn discard_file(path: String, file: String) -> AppResult<()> {
+pub async fn discard_file(path: String, file: String) -> AppResult<()> {
     git::status::discard_file(&repo(&path)?, &file)
 }
 
@@ -367,13 +372,13 @@ pub fn discard_file(path: String, file: String) -> AppResult<()> {
 
 /// Commit the given files.
 #[tauri::command]
-pub fn commit(path: String, files: Vec<String>, message: String) -> AppResult<SaveResult> {
+pub async fn commit(path: String, files: Vec<String>, message: String) -> AppResult<SaveResult> {
     git::commits::commit(&repo(&path)?, &files, &message)
 }
 
 /// Replace the most recent commit.
 #[tauri::command]
-pub fn amend_commit(
+pub async fn amend_commit(
     path: String,
     message: String,
     files: Option<Vec<String>>,
@@ -384,31 +389,31 @@ pub fn amend_commit(
 /// Whether the last commit is already on the remote, so the UI can warn before
 /// amending it.
 #[tauri::command]
-pub fn head_is_pushed(path: String) -> AppResult<bool> {
+pub async fn head_is_pushed(path: String) -> AppResult<bool> {
     Ok(git::commits::head_is_pushed(&repo(&path)?))
 }
 
 /// Commits made here that the remote does not have yet.
 #[tauri::command]
-pub fn pending_commits(path: String) -> AppResult<Vec<LocalSave>> {
+pub async fn pending_commits(path: String) -> AppResult<Vec<LocalSave>> {
     git::commits::pending_commits(&repo(&path)?)
 }
 
 /// Files touched by one commit, with diffs.
 #[tauri::command]
-pub fn commit_files(path: String, hash: String) -> AppResult<Vec<ChangedFile>> {
+pub async fn commit_files(path: String, hash: String) -> AppResult<Vec<ChangedFile>> {
     git::commits::commit_files(&repo(&path)?, &hash)
 }
 
 /// Full detail for one commit.
 #[tauri::command]
-pub fn commit_detail(path: String, hash: String) -> AppResult<Commit> {
+pub async fn commit_detail(path: String, hash: String) -> AppResult<Commit> {
     git::history::commit_detail(&repo(&path)?, &hash)
 }
 
 /// Undo a commit by adding one that reverses it.
 #[tauri::command]
-pub fn revert_commit(path: String, hash: String) -> AppResult<Vec<Conflict>> {
+pub async fn revert_commit(path: String, hash: String) -> AppResult<Vec<Conflict>> {
     let repo = repo(&path)?;
     let conflicted = git::commits::revert(&repo, &hash)?;
 
@@ -421,7 +426,7 @@ pub fn revert_commit(path: String, hash: String) -> AppResult<Vec<Conflict>> {
 
 /// Apply a single commit from another branch onto this one.
 #[tauri::command]
-pub fn cherry_pick(path: String, hash: String) -> AppResult<Vec<Conflict>> {
+pub async fn cherry_pick(path: String, hash: String) -> AppResult<Vec<Conflict>> {
     let repo = repo(&path)?;
     let conflicted = git::commits::cherry_pick(&repo, &hash)?;
 
@@ -434,13 +439,13 @@ pub fn cherry_pick(path: String, hash: String) -> AppResult<Vec<Conflict>> {
 
 /// Move the branch to another commit. Destructive when `mode` is "hard".
 #[tauri::command]
-pub fn reset_to(path: String, hash: String, mode: String) -> AppResult<()> {
+pub async fn reset_to(path: String, hash: String, mode: String) -> AppResult<()> {
     git::commits::reset(&repo(&path)?, &hash, &mode)
 }
 
 /// Guard-rail checks the UI runs before committing.
 #[tauri::command]
-pub fn commit_warnings(
+pub async fn commit_warnings(
     path: String,
     files: Vec<String>,
     check_large_files: Option<bool>,
@@ -465,40 +470,40 @@ pub fn commit_warnings(
 /* ========================================================================== */
 
 #[tauri::command]
-pub fn branches(path: String) -> AppResult<Vec<Branch>> {
+pub async fn branches(path: String) -> AppResult<Vec<Branch>> {
     git::branches::list(&repo(&path)?)
 }
 
 #[tauri::command]
-pub fn create_branch(path: String, name: String, from: String) -> AppResult<Branch> {
+pub async fn create_branch(path: String, name: String, from: String) -> AppResult<Branch> {
     git::branches::create(&repo(&path)?, &name, &from)
 }
 
 #[tauri::command]
-pub fn switch_branch(path: String, name: String) -> AppResult<()> {
+pub async fn switch_branch(path: String, name: String) -> AppResult<()> {
     git::branches::switch(&repo(&path)?, &name)
 }
 
 #[tauri::command]
-pub fn rename_branch(path: String, from: String, to: String) -> AppResult<()> {
+pub async fn rename_branch(path: String, from: String, to: String) -> AppResult<()> {
     git::branches::rename(&repo(&path)?, &from, &to)
 }
 
 /// Delete a branch. `force` is required to lose unmerged work, and the UI
 /// counts that work first with [`unmerged_count`].
 #[tauri::command]
-pub fn delete_branch(path: String, name: String, force: Option<bool>) -> AppResult<()> {
+pub async fn delete_branch(path: String, name: String, force: Option<bool>) -> AppResult<()> {
     git::branches::delete(&repo(&path)?, &name, force.unwrap_or(false))
 }
 
 /// How many commits would be lost by deleting a branch.
 #[tauri::command]
-pub fn unmerged_count(path: String, name: String) -> AppResult<u32> {
+pub async fn unmerged_count(path: String, name: String) -> AppResult<u32> {
     Ok(git::branches::unmerged_count(&repo(&path)?, &name))
 }
 
 #[tauri::command]
-pub fn merge_branch(path: String, from: String) -> AppResult<Vec<Conflict>> {
+pub async fn merge_branch(path: String, from: String) -> AppResult<Vec<Conflict>> {
     let repo = repo(&path)?;
     let conflicted = git::branches::merge(&repo, &from)?;
 
@@ -510,7 +515,7 @@ pub fn merge_branch(path: String, from: String) -> AppResult<Vec<Conflict>> {
 }
 
 #[tauri::command]
-pub fn rebase_branch(path: String, onto: String) -> AppResult<Vec<Conflict>> {
+pub async fn rebase_branch(path: String, onto: String) -> AppResult<Vec<Conflict>> {
     let repo = repo(&path)?;
     let conflicted = git::branches::rebase(&repo, &onto)?;
 
@@ -523,7 +528,7 @@ pub fn rebase_branch(path: String, onto: String) -> AppResult<Vec<Conflict>> {
 
 /// Compare two branches or commits.
 #[tauri::command]
-pub fn compare_refs(path: String, base: String, head: String) -> AppResult<Comparison> {
+pub async fn compare_refs(path: String, base: String, head: String) -> AppResult<Comparison> {
     git::branches::compare(&repo(&path)?, &base, &head)
 }
 
@@ -532,19 +537,19 @@ pub fn compare_refs(path: String, base: String, head: String) -> AppResult<Compa
 /* ========================================================================== */
 
 #[tauri::command]
-pub fn history(path: String, branch: String, limit: Option<u32>) -> AppResult<Vec<Commit>> {
+pub async fn history(path: String, branch: String, limit: Option<u32>) -> AppResult<Vec<Commit>> {
     git::history::history(&repo(&path)?, &branch, limit.unwrap_or(200))
 }
 
 /// Every commit that touched one file.
 #[tauri::command]
-pub fn file_history(path: String, file: String, limit: Option<u32>) -> AppResult<Vec<Commit>> {
+pub async fn file_history(path: String, file: String, limit: Option<u32>) -> AppResult<Vec<Commit>> {
     git::history::file_history(&repo(&path)?, &file, limit.unwrap_or(100))
 }
 
 /// Who last changed each line of a file.
 #[tauri::command]
-pub fn blame(path: String, file: String, rev: Option<String>) -> AppResult<Vec<BlameLine>> {
+pub async fn blame(path: String, file: String, rev: Option<String>) -> AppResult<Vec<BlameLine>> {
     git::history::blame(&repo(&path)?, &file, rev.as_deref())
 }
 
@@ -553,37 +558,37 @@ pub fn blame(path: String, file: String, rev: Option<String>) -> AppResult<Vec<B
 /* ========================================================================== */
 
 #[tauri::command]
-pub fn remotes(path: String) -> AppResult<Vec<Remote>> {
+pub async fn remotes(path: String) -> AppResult<Vec<Remote>> {
     git::remote::list(&repo(&path)?)
 }
 
 #[tauri::command]
-pub fn add_remote(path: String, name: String, url: String) -> AppResult<()> {
+pub async fn add_remote(path: String, name: String, url: String) -> AppResult<()> {
     git::remote::add(&repo(&path)?, &name, &url)
 }
 
 #[tauri::command]
-pub fn set_remote_url(path: String, name: String, url: String) -> AppResult<()> {
+pub async fn set_remote_url(path: String, name: String, url: String) -> AppResult<()> {
     git::remote::set_url(&repo(&path)?, &name, &url)
 }
 
 #[tauri::command]
-pub fn remove_remote(path: String, name: String) -> AppResult<()> {
+pub async fn remove_remote(path: String, name: String) -> AppResult<()> {
     git::remote::remove(&repo(&path)?, &name)
 }
 
 #[tauri::command]
-pub fn sync_state(path: String) -> AppResult<SyncState> {
+pub async fn sync_state(path: String) -> AppResult<SyncState> {
     git::remote::sync_state(&repo(&path)?)
 }
 
 #[tauri::command]
-pub fn fetch_remotes(path: String) -> AppResult<SyncState> {
+pub async fn fetch_remotes(path: String) -> AppResult<SyncState> {
     git::remote::fetch(&repo(&path)?)
 }
 
 #[tauri::command]
-pub fn pull(path: String, strategy: Option<String>) -> AppResult<Vec<Conflict>> {
+pub async fn pull(path: String, strategy: Option<String>) -> AppResult<Vec<Conflict>> {
     let repo = repo(&path)?;
     let conflicted = git::remote::pull(&repo, strategy.as_deref().unwrap_or("merge"))?;
 
@@ -595,17 +600,17 @@ pub fn pull(path: String, strategy: Option<String>) -> AppResult<Vec<Conflict>> 
 }
 
 #[tauri::command]
-pub fn push_to_github(path: String, force: Option<bool>) -> AppResult<PushResult> {
+pub async fn push_to_github(path: String, force: Option<bool>) -> AppResult<PushResult> {
     git::remote::push(&repo(&path)?, force.unwrap_or(false))
 }
 
 #[tauri::command]
-pub fn push_tags(path: String) -> AppResult<()> {
+pub async fn push_tags(path: String) -> AppResult<()> {
     git::remote::push_tags(&repo(&path)?)
 }
 
 #[tauri::command]
-pub fn sync_fork(path: String) -> AppResult<Vec<Conflict>> {
+pub async fn sync_fork(path: String) -> AppResult<Vec<Conflict>> {
     let repo = repo(&path)?;
     let conflicted = git::remote::sync_fork(&repo)?;
 
@@ -621,17 +626,17 @@ pub fn sync_fork(path: String) -> AppResult<Vec<Conflict>> {
 /* ========================================================================== */
 
 #[tauri::command]
-pub fn stashes(path: String) -> AppResult<Vec<Stash>> {
+pub async fn stashes(path: String) -> AppResult<Vec<Stash>> {
     git::stash::list(&repo(&path)?)
 }
 
 #[tauri::command]
-pub fn stash_push(path: String, message: String) -> AppResult<Stash> {
+pub async fn stash_push(path: String, message: String) -> AppResult<Stash> {
     git::stash::push(&repo(&path)?, &message)
 }
 
 #[tauri::command]
-pub fn stash_pop(path: String, id: String) -> AppResult<Vec<Conflict>> {
+pub async fn stash_pop(path: String, id: String) -> AppResult<Vec<Conflict>> {
     let repo = repo(&path)?;
     let conflicted = git::stash::pop(&repo, &id)?;
 
@@ -643,7 +648,7 @@ pub fn stash_pop(path: String, id: String) -> AppResult<Vec<Conflict>> {
 }
 
 #[tauri::command]
-pub fn stash_apply(path: String, id: String) -> AppResult<Vec<Conflict>> {
+pub async fn stash_apply(path: String, id: String) -> AppResult<Vec<Conflict>> {
     let repo = repo(&path)?;
     let conflicted = git::stash::apply(&repo, &id)?;
 
@@ -655,12 +660,12 @@ pub fn stash_apply(path: String, id: String) -> AppResult<Vec<Conflict>> {
 }
 
 #[tauri::command]
-pub fn stash_drop(path: String, id: String) -> AppResult<()> {
+pub async fn stash_drop(path: String, id: String) -> AppResult<()> {
     git::stash::drop(&repo(&path)?, &id)
 }
 
 #[tauri::command]
-pub fn stash_show(path: String, id: String) -> AppResult<String> {
+pub async fn stash_show(path: String, id: String) -> AppResult<String> {
     git::stash::show(&repo(&path)?, &id)
 }
 
@@ -669,31 +674,31 @@ pub fn stash_show(path: String, id: String) -> AppResult<String> {
 /* ========================================================================== */
 
 #[tauri::command]
-pub fn conflicts(path: String) -> AppResult<Vec<Conflict>> {
+pub async fn conflicts(path: String) -> AppResult<Vec<Conflict>> {
     git::conflicts::list(&repo(&path)?)
 }
 
 /// Which operation, if any, the repository is in the middle of.
 #[tauri::command]
-pub fn repo_operation(path: String) -> AppResult<RepoOperation> {
+pub async fn repo_operation(path: String) -> AppResult<RepoOperation> {
     Ok(git::conflicts::operation(&repo(&path)?))
 }
 
 /// Resolve one file by keeping one side.
 #[tauri::command]
-pub fn resolve_conflict(path: String, file: String, keep: String) -> AppResult<()> {
+pub async fn resolve_conflict(path: String, file: String, keep: String) -> AppResult<()> {
     git::conflicts::resolve(&repo(&path)?, &file, &keep)
 }
 
 /// Read a conflicted file for manual editing.
 #[tauri::command]
-pub fn conflict_file_contents(path: String, file: String) -> AppResult<String> {
+pub async fn conflict_file_contents(path: String, file: String) -> AppResult<String> {
     git::conflicts::file_contents(&repo(&path)?, &file)
 }
 
 /// Save a manually resolved file and mark it done.
 #[tauri::command]
-pub fn resolve_conflict_manually(
+pub async fn resolve_conflict_manually(
     path: String,
     file: String,
     contents: String,
@@ -703,19 +708,19 @@ pub fn resolve_conflict_manually(
 
 /// Mark a file the user fixed in their own editor as resolved.
 #[tauri::command]
-pub fn mark_resolved(path: String, file: String) -> AppResult<()> {
+pub async fn mark_resolved(path: String, file: String) -> AppResult<()> {
     git::conflicts::mark_resolved(&repo(&path)?, &file)
 }
 
 /// Finish the merge, rebase, cherry-pick or revert that stopped.
 #[tauri::command]
-pub fn continue_operation(path: String) -> AppResult<()> {
+pub async fn continue_operation(path: String) -> AppResult<()> {
     git::conflicts::cont(&repo(&path)?)
 }
 
 /// Abandon the operation in progress.
 #[tauri::command]
-pub fn abort_operation(path: String) -> AppResult<()> {
+pub async fn abort_operation(path: String) -> AppResult<()> {
     git::conflicts::abort(&repo(&path)?)
 }
 
@@ -724,12 +729,12 @@ pub fn abort_operation(path: String) -> AppResult<()> {
 /* ========================================================================== */
 
 #[tauri::command]
-pub fn tags(path: String) -> AppResult<Vec<Tag>> {
+pub async fn tags(path: String) -> AppResult<Vec<Tag>> {
     git::tags::list(&repo(&path)?)
 }
 
 #[tauri::command]
-pub fn create_tag(
+pub async fn create_tag(
     path: String,
     name: String,
     message: String,
@@ -739,7 +744,7 @@ pub fn create_tag(
 }
 
 #[tauri::command]
-pub fn delete_tag(path: String, name: String) -> AppResult<()> {
+pub async fn delete_tag(path: String, name: String) -> AppResult<()> {
     git::tags::delete(&repo(&path)?, &name)
 }
 
@@ -748,14 +753,14 @@ pub fn delete_tag(path: String, name: String) -> AppResult<()> {
 /* ========================================================================== */
 
 #[tauri::command]
-pub fn pull_requests(path: String) -> AppResult<Vec<PullRequest>> {
+pub async fn pull_requests(path: String) -> AppResult<Vec<PullRequest>> {
     let repo = repo(&path)?;
     let me = github::auth::account().map(|a| a.login);
     github::pulls::list(&repo, me.as_deref())
 }
 
 #[tauri::command]
-pub fn create_pull_request(
+pub async fn create_pull_request(
     path: String,
     head: String,
     base: String,
@@ -767,7 +772,7 @@ pub fn create_pull_request(
 }
 
 #[tauri::command]
-pub fn merge_pull_request(
+pub async fn merge_pull_request(
     path: String,
     number: u64,
     strategy: Option<String>,
@@ -780,44 +785,44 @@ pub fn merge_pull_request(
 }
 
 #[tauri::command]
-pub fn close_pull_request(path: String, number: u64) -> AppResult<()> {
+pub async fn close_pull_request(path: String, number: u64) -> AppResult<()> {
     github::pulls::close(&repo(&path)?, number)
 }
 
 #[tauri::command]
-pub fn issues(path: String) -> AppResult<Vec<Issue>> {
+pub async fn issues(path: String) -> AppResult<Vec<Issue>> {
     let repo = repo(&path)?;
     let me = github::auth::account().map(|a| a.login);
     github::issues::list(&repo, me.as_deref())
 }
 
 #[tauri::command]
-pub fn create_issue(path: String, title: String, body: String) -> AppResult<Issue> {
+pub async fn create_issue(path: String, title: String, body: String) -> AppResult<Issue> {
     github::issues::create(&repo(&path)?, &title, &body)
 }
 
 #[tauri::command]
-pub fn close_issue(path: String, number: u64) -> AppResult<()> {
+pub async fn close_issue(path: String, number: u64) -> AppResult<()> {
     github::issues::close(&repo(&path)?, number)
 }
 
 #[tauri::command]
-pub fn workflow_runs(path: String, limit: Option<u32>) -> AppResult<Vec<WorkflowRun>> {
+pub async fn workflow_runs(path: String, limit: Option<u32>) -> AppResult<Vec<WorkflowRun>> {
     github::runs::list(&repo(&path)?, limit.unwrap_or(30))
 }
 
 #[tauri::command]
-pub fn rerun_workflow(path: String, id: String) -> AppResult<()> {
+pub async fn rerun_workflow(path: String, id: String) -> AppResult<()> {
     github::runs::rerun(&repo(&path)?, &id)
 }
 
 #[tauri::command]
-pub fn releases(path: String, limit: Option<u32>) -> AppResult<Vec<Release>> {
+pub async fn releases(path: String, limit: Option<u32>) -> AppResult<Vec<Release>> {
     github::releases::list(&repo(&path)?, limit.unwrap_or(30))
 }
 
 #[tauri::command]
-pub fn create_release(
+pub async fn create_release(
     path: String,
     tag: String,
     title: String,
@@ -837,13 +842,13 @@ pub fn create_release(
 
 /// Repositories the signed-in user can clone.
 #[tauri::command]
-pub fn my_repos(limit: Option<u32>) -> AppResult<Vec<RemoteRepo>> {
+pub async fn my_repos(limit: Option<u32>) -> AppResult<Vec<RemoteRepo>> {
     github::auth::my_repos(limit.unwrap_or(50))
 }
 
 /// Create an empty repository on GitHub.
 #[tauri::command]
-pub fn create_github_repo(
+pub async fn create_github_repo(
     name: String,
     description: String,
     private: bool,
@@ -857,13 +862,13 @@ pub fn create_github_repo(
 
 /// Whether AI features are available at all.
 #[tauri::command]
-pub fn ai_available() -> bool {
+pub async fn ai_available() -> bool {
     crate::ai::available()
 }
 
 /// Suggest a commit message. Falls back to a local heuristic without a key.
 #[tauri::command]
-pub fn suggest_commit_message(
+pub async fn suggest_commit_message(
     path: String,
     files: Vec<String>,
     use_ai: Option<bool>,
@@ -894,7 +899,7 @@ pub fn suggest_commit_message(
 
 /// A plain-English summary of the current changes.
 #[tauri::command]
-pub fn explain_changes(path: String, files: Vec<String>) -> AppResult<String> {
+pub async fn explain_changes(path: String, files: Vec<String>) -> AppResult<String> {
     let repo = repo(&path)?;
     let all = git::status::changed_files(&repo)?;
 
@@ -915,13 +920,13 @@ pub fn explain_changes(path: String, files: Vec<String>) -> AppResult<String> {
 
 /// Explain a Git error in plain English.
 #[tauri::command]
-pub fn explain_error(message: String, detail: Option<String>) -> AppResult<String> {
+pub async fn explain_error(message: String, detail: Option<String>) -> AppResult<String> {
     crate::ai::explain_error(&message, detail.as_deref())
 }
 
 /// Explain one merge conflict.
 #[tauri::command]
-pub fn explain_conflict(path: String, file: String) -> AppResult<String> {
+pub async fn explain_conflict(path: String, file: String) -> AppResult<String> {
     let repo = repo(&path)?;
 
     let conflict = git::conflicts::list(&repo)?
@@ -938,13 +943,13 @@ pub fn explain_conflict(path: String, file: String) -> AppResult<String> {
 
 /// Every saved preference, for the frontend to hydrate from on launch.
 #[tauri::command]
-pub fn get_settings(state: State<'_, AppState>) -> AppResult<std::collections::HashMap<String, String>> {
+pub async fn get_settings(state: State<'_, AppState>) -> AppResult<std::collections::HashMap<String, String>> {
     state.store.all_settings()
 }
 
 /// Save one preference.
 #[tauri::command]
-pub fn set_setting(state: State<'_, AppState>, key: String, value: String) -> AppResult<()> {
+pub async fn set_setting(state: State<'_, AppState>, key: String, value: String) -> AppResult<()> {
     if key.trim().is_empty() {
         return Err(AppError::invalid("A setting needs a name."));
     }
@@ -957,8 +962,21 @@ pub fn set_setting(state: State<'_, AppState>, key: String, value: String) -> Ap
 
 /// Reveal the project folder in Explorer / Finder.
 #[tauri::command]
-pub fn open_folder(path: String) -> AppResult<()> {
-    let repo = repo(&path)?;
+pub async fn open_folder(path: String) -> AppResult<()> {
+    // Validate that it is a repository, but open the path the user knows.
+    //
+    // `repo()` canonicalises, and on Windows that yields an extended-length
+    // path (`\\?\C:\…`). Explorer does not understand that prefix: handed one
+    // it silently opens Documents instead of the project, which is exactly the
+    // "it opens the wrong folder" symptom. So the check uses the canonical
+    // form and the argument uses the plain one.
+    let _ = repo(&path)?;
+
+    let target = std::path::Path::new(&path);
+    let display = target
+        .to_str()
+        .map(|s| s.trim_start_matches(r"\\?\").to_string())
+        .unwrap_or_else(|| path.clone());
 
     // Only ever a folder this app has already validated as a repository, and
     // the path is passed as an argument rather than through a shell.
@@ -970,8 +988,10 @@ pub fn open_folder(path: String) -> AppResult<()> {
         "xdg-open"
     };
 
+    // Explorer returns exit code 1 even when it succeeds, so its status is not
+    // checked — only a failure to start the process is a real error.
     std::process::Command::new(program)
-        .arg(repo.as_os_str())
+        .arg(&display)
         .spawn()
         .map_err(|e| {
             AppError::new(ErrorKind::Unknown, "Could not open that folder.")

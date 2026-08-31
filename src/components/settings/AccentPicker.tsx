@@ -20,6 +20,20 @@ export function AccentPicker({ value, paletteAccent, onChange }: AccentPickerPro
   const inputId = useId();
   const [draft, setDraft] = useState(value ?? "#5b8cff");
 
+  /**
+   * Whether the inline picker is open.
+   *
+   * The browser's own `type="color"` control opens the operating system's
+   * colour dialog — a separate window, with its own OK and Cancel, that covers
+   * the app. Choosing an accent is a small decision made by looking at the
+   * result, so the picker stays on this page and the surrounding settings
+   * remain visible while it is open.
+   */
+  const [picking, setPicking] = useState(false);
+
+  /** What the accent was when the picker opened, so Cancel can restore it. */
+  const [before, setBefore] = useState<string | null>(value);
+
   const activeHex = value ?? rgbTripleToHex(paletteAccent);
   const triple = hexToRgbTriple(activeHex);
 
@@ -30,6 +44,18 @@ export function AccentPicker({ value, paletteAccent, onChange }: AccentPickerPro
   function commit(hex: string) {
     setDraft(hex);
     onChange(hex);
+  }
+
+  function openPicker() {
+    setBefore(value);
+    setDraft(value ?? rgbTripleToHex(paletteAccent));
+    setPicking(true);
+  }
+
+  function cancelPicker() {
+    onChange(before);
+    setDraft(before ?? rgbTripleToHex(paletteAccent));
+    setPicking(false);
   }
 
   return (
@@ -57,8 +83,10 @@ export function AccentPicker({ value, paletteAccent, onChange }: AccentPickerPro
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <label
-          htmlFor={inputId}
+        <button
+          type="button"
+          onClick={() => (picking ? cancelPicker() : openPicker())}
+          aria-expanded={picking}
           className="inline-flex cursor-pointer items-center gap-[10px] rounded-md border border-line px-3 py-[7px] text-xs text-muted transition-colors hover:bg-surface-alt hover:text-content"
         >
           <span
@@ -66,32 +94,68 @@ export function AccentPicker({ value, paletteAccent, onChange }: AccentPickerPro
             style={{ background: draft }}
           />
           Choose your own colour
-          <input
-            id={inputId}
-            type="color"
-            value={draft}
-            onChange={(e) => commit(e.target.value)}
-            className="sr-only"
-          />
-        </label>
-
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => {
-            const next = e.target.value;
-            setDraft(next);
-            if (hexToRgbTriple(next)) onChange(next);
-          }}
-          spellCheck={false}
-          aria-label="Accent colour hex value"
-          className="w-[104px] rounded-md border border-line bg-surface px-[10px] py-[7px] font-mono text-xs uppercase text-content outline-none transition-colors focus:border-accent"
-        />
+        </button>
 
         <PreviewButton />
       </div>
 
-      {lowContrast && (
+      {/* The picker itself, inline — the settings behind it stay visible, so
+          the accent can be judged against the interface it will colour. */}
+      {picking && (
+        <div className="flex flex-col gap-3 rounded-card border border-line bg-surface-alt/40 p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              id={inputId}
+              type="color"
+              value={draft}
+              onChange={(e) => commit(e.target.value)}
+              aria-label="Accent colour"
+              className="h-[42px] w-[64px] cursor-pointer rounded-md border border-line bg-surface p-1"
+            />
+
+            <label className="flex flex-col gap-[4px]">
+              <span className="text-2xs uppercase tracking-[0.08em] text-faint">Hex</span>
+              <input
+                type="text"
+                value={draft}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setDraft(next);
+                  if (hexToRgbTriple(next)) onChange(next);
+                }}
+                spellCheck={false}
+                aria-label="Accent colour hex value"
+                className="w-[104px] rounded-md border border-line bg-surface px-[10px] py-[7px] font-mono text-xs uppercase text-content outline-none transition-colors focus:border-accent"
+              />
+            </label>
+          </div>
+
+          {lowContrast && (
+            <p className="text-xs text-modified">
+              This colour is hard to read against button text. Try a deeper or lighter shade.
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={cancelPicker}
+              className="rounded-md border border-line px-3 py-[6px] text-xs text-muted transition-colors hover:bg-surface-alt hover:text-content"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => setPicking(false)}
+              className="rounded-md bg-accent px-3 py-[6px] text-xs font-medium text-accent-ink transition-opacity hover:opacity-90"
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!picking && lowContrast && (
         <p className="text-xs text-modified">
           This colour is hard to read against button text. Try a deeper or lighter shade.
         </p>

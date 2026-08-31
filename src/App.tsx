@@ -241,23 +241,33 @@ export default function App() {
   /** Everything that needs the network. Failures here must not break the app. */
   const loadGitHubState = useCallback(async (target: Repository) => {
     if (!target.githubUrl) return;
+    const url = target.githubUrl;
+
     setLoadingGitHub(true);
-    try {
-      const [prs, issueList, runList, releaseList] = await Promise.all([
-        githubService.getPullRequests(target.githubUrl),
-        githubService.getIssues(target.githubUrl),
-        githubService.getWorkflowRuns(target.githubUrl),
-        githubService.getReleases(target.githubUrl),
-      ]);
-      setPullRequests(prs);
-      setIssues(issueList);
-      setRuns(runList);
-      setReleases(releaseList);
-    } catch {
+
+    // Each screen fills in as its own answer arrives rather than all four
+    // waiting on the slowest. Every one of these is a network round trip
+    // through the GitHub CLI, so on a slow connection the difference between
+    // "pull requests appear in a second" and "nothing appears for ten" is
+    // entirely this.
+    //
+    // A failure is reported once, not four times, and never blocks the local
+    // half of the app — which is the whole point of keeping the two apart.
+    let failed = false;
+    const note = () => {
+      if (failed) return;
+      failed = true;
       toast("Could not reach GitHub. Everything on this computer still works.", "warn");
-    } finally {
-      setLoadingGitHub(false);
-    }
+    };
+
+    await Promise.allSettled([
+      githubService.getPullRequests(url).then(setPullRequests).catch(note),
+      githubService.getIssues(url).then(setIssues).catch(note),
+      githubService.getWorkflowRuns(url).then(setRuns).catch(note),
+      githubService.getReleases(url).then(setReleases).catch(note),
+    ]);
+
+    setLoadingGitHub(false);
   }, [toast]);
 
   /**
@@ -355,12 +365,27 @@ export default function App() {
       // this has to happen before any GitHub call for the new repository.
       setActiveRepoPath(selected.path);
 
-      const changed = await loadRepoState(selected);
+      // Show the connection dialog immediately.
+      //
+      // Everything below it — the file list, history, the commit suggestion,
+      // anything from GitHub — is work the dialog does not display, and the
+      // only thing it asks for is a branch name it already has. Awaiting any of
+      // it first meant the window sat frozen between choosing a folder and the
+      // dialog appearing, which on a large repository is seconds.
       setRepo(selected);
       setPushResult(null);
-      setPendingCommits(await gitService.getPendingCommits(selected).catch(() => []));
+      setPendingCommits([]);
       setConnectedRepo(selected);
-      await loadSuggestion(changed);
+
+      // Loaded in the background; the branch list refreshes the dialog in place
+      // as soon as it arrives.
+      void loadRepoState(selected)
+        .then((changed) => void loadSuggestion(changed, selected))
+        .catch(() => undefined);
+      void gitService
+        .getPendingCommits(selected)
+        .then(setPendingCommits)
+        .catch(() => undefined);
       void loadGitHubState(selected);
     },
     [loadRepoState, loadSuggestion, loadGitHubState],
