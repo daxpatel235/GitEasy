@@ -21,9 +21,11 @@ Grab the installer for your platform from the [**Releases**](https://github.com/
 | -------- | ---- |
 | Windows  | `.exe` installer, or `.msi` for managed deployments |
 | macOS    | `.dmg` |
-| Linux    | `.AppImage` or `.deb` |
+| Linux    | `.AppImage`, `.deb` or `.rpm` |
 
 No account required. No sign-up wall. GitEasy is free, and it stays free.
+
+What changed in each version is in the [changelog](CHANGELOG.md).
 
 ---
 
